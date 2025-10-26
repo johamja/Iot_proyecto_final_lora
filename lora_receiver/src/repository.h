@@ -9,7 +9,7 @@ struct data {
     String action;
 };
 
-JsonDocument Submit_an_incident(const Incident &incident)
+//JsonDocument Submit_an_incident(const Incident &incident)
 
 
 

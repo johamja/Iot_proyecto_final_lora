@@ -5,6 +5,7 @@
 #include <Wire.h>
 #include "ClosedCube_HDC1080.h"
 #include "LoRaBoards.h"
+#include "constants.h"
 
 // ----- CONFIGURACIÓN LORA -----
 #ifndef CONFIG_RADIO_FREQ
@@ -26,8 +27,7 @@ HardwareSerial gpsSerial(1);  // UART1 para el GPS
 
 // ----- CONFIGURACIÓN HDC1080 -----
 ClosedCube_HDC1080 hdc1080;
-#define SDA_PIN 32
-#define SCL_PIN 35
+// Use board-default I2C pins from utilities.h (I2C_SDA / I2C_SCL)
 
 // ----- VARIABLES -----
 unsigned long lastSend = 0;
@@ -49,7 +49,12 @@ void setup() {
   Serial.println("GPS inicializado");
 
   // --- Inicializa sensor HDC1080 ---
-  Wire.begin(SDA_PIN, SCL_PIN);
+#ifdef I2C_SDA
+  Wire.begin(I2C_SDA, I2C_SCL);
+#else
+  // Fallback: let Wire use default pins for the board
+  Wire.begin();
+#endif
   hdc1080.begin(0x40);
   Serial.print("Fabricante HDC1080 ID: ");
   Serial.println(hdc1080.readManufacturerId(), HEX);
@@ -99,7 +104,7 @@ void loop() {
   double temp = hdc1080.readTemperature();
   double hum = hdc1080.readHumidity();
 
-  if (millis() - lastSend > 1000) { // cada 1 segundo
+  if (millis() - lastSend > 3000) { // cada 1 segundo
     lastSend = millis();
 
     if (leerGPS(lat, lng)) {
@@ -107,7 +112,7 @@ void loop() {
 
       // Enviar por LoRa
       LoRa.beginPacket();
-      LoRa.printf("GPS:%.6f,%.6f;T:%.2f;H:%.2f;#%d", lat, lng, temp, hum, counter);
+      LoRa.printf("GPS:%.6f,%.6f;T:%.2f;H:%.2f;#%d", lat, lng, temp, hum, counter, ID);
       LoRa.endPacket();
 
       Serial.printf("Enviado por LoRa: #%d\n", counter);

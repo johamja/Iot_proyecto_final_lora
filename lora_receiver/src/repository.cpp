@@ -3,6 +3,7 @@
 #include "repository.h"
 #include "config.h"
 
+/*
 JsonDocument Submit_an_incident(const Incident &incident) {
     preferences.begin("my-app", false);
     const String url_pref = preferences.getString("url");
@@ -56,3 +57,4 @@ JsonDocument Submit_an_incident(const Incident &incident) {
     JsonDocument emptyDoc;
     return emptyDoc; // Retorna un JSON vacío si algo falló
 }
+*/
