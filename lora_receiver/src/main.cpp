@@ -1,4 +1,5 @@
 #include <Arduino.h>
+<<<<<<< Updated upstream
 #include <WiFi.h>
 #include <HTTPClient.h>
 #include <LoRa.h>
@@ -341,4 +342,59 @@ void loop()
     }
 
     delay(50);
+=======
+#include <LoRa.h>
+#include <WiFi.h>
+#include <HTTPClient.h>
+#include <ArduinoJson.h>
+#include "constants.h"
+#include "services.h"
+
+int state = 1;
+
+void setup()
+{
+    Serial.begin(SERIAL_BAUDRATE);
+    pinMode(LED, OUTPUT);
+
+    Lora_connection();
+    WiFi_connection();
+
+    Serial.println("Receptor LoRa FIWARE listo - Esperando datos...");
+}
+
+void loop()
+{
+    switch (state)
+    {
+        // RECEIVE - Esperar datos LoRa
+    case 1:
+        int packetSize = LoRa.parsePacket();
+
+        if (packetSize)
+        {
+            
+        }
+        else
+        {
+        }
+
+        break;
+    case 2:
+        /* code */
+        break;
+    case 3:
+        /* code */
+        break;
+    case 4:
+        /* code */
+        break;
+    case 5:
+        /* code */
+        break;
+
+    default:
+        break;
+    }
+>>>>>>> Stashed changes
 }
