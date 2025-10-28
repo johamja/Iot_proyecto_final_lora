@@ -3,6 +3,22 @@
 #include "repository.h"
 #include "config.h"
 
+
+void Http_errors(int httpCode) {
+    // Client error (4xx)
+    if (httpCode >= 400 && httpCode < 500) {
+        Serial.printf("[HTTP] [Get_subscriptions] Client error: %d\n", httpCode);
+    }
+    // Server error (5xx)
+    else if (httpCode >= 500) {
+        Serial.printf("[HTTP] [Get_subscriptions] Server error: %d\n", httpCode);
+    }
+    // Otros códigos inesperados
+    else {
+        Serial.printf("[HTTP] [Get_subscriptions] Unexpected HTTP code: %d\n", httpCode);
+    }
+}
+
 DynamicJsonDocument Get_subscriptions() {
     HTTPClient http;
     const String url = URL_SERVER  "/subscriptions";
@@ -222,18 +238,3 @@ bool Post_new_entity(const DynamicJsonDocument &bodyDoc)
     return false;
 }
 
-
-void Http_errors(int httpCode) {
-    // Client error (4xx)
-    if (httpCode >= 400 && httpCode < 500) {
-        Serial.printf("[HTTP] [Get_subscriptions] Client error: %d\n", httpCode);
-    }
-    // Server error (5xx)
-    else if (httpCode >= 500) {
-        Serial.printf("[HTTP] [Get_subscriptions] Server error: %d\n", httpCode);
-    }
-    // Otros códigos inesperados
-    else {
-        Serial.printf("[HTTP] [Get_subscriptions] Unexpected HTTP code: %d\n", httpCode);
-    }
-}

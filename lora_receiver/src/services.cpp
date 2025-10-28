@@ -166,56 +166,46 @@ DynamicJsonDocument Create_orion_package(String message, int rssi, float snr, in
 
 bool Has_description_and_type(const DynamicJsonDocument &doc, const char *wanted_description, const char *wanted_type)
 {
-    if (!doc.is<JsonArray>())
-        return false;
+    // En ArduinoJson v7 usa tipos "Const" cuando el documento es const
+    if (!doc.is<JsonArray>()) return false;
 
-    JsonArray arr = doc.as<JsonArray>();
+    JsonArrayConst arr = doc.as<JsonArrayConst>();
     bool foundDescription = false;
     bool foundType = false;
 
-    for (JsonVariant v : arr)
-    {
-        if (!v.is<JsonObject>())
-            continue;
-        JsonObject sub = v.as<JsonObject>();
+    for (JsonVariantConst v : arr) {
+        if (!v.is<JsonObject>()) continue;
+        JsonObjectConst sub = v.as<JsonObjectConst>();
 
-        // description
-        if (!foundDescription && sub.containsKey("description") && sub["description"].is<const char *>())
-        {
-            const char *desc = sub["description"];
-            if (desc && strcmp(desc, wanted_description) == 0)
-            {
+        // Validar description
+        if (!foundDescription && sub["description"].is<const char*>()) {
+            const char* desc = sub["description"].as<const char*>();
+            if (desc && strcmp(desc, wanted_description) == 0) {
                 foundDescription = true;
             }
         }
 
-        // subject.entities[].type
-        if (!foundType && sub.containsKey("subject") && sub["subject"].is<JsonObject>())
-        {
-            JsonObject subject = sub["subject"].as<JsonObject>();
-            if (subject.containsKey("entities") && subject["entities"].is<JsonArray>())
-            {
-                JsonArray entities = subject["entities"].as<JsonArray>();
-                for (JsonVariant ev : entities)
-                {
-                    if (!ev.is<JsonObject>())
-                        continue;
-                    JsonObject ent = ev.as<JsonObject>();
-                    if (ent.containsKey("type") && ent["type"].is<const char *>())
-                    {
-                        const char *typ = ent["type"];
-                        if (typ && strcmp(typ, wanted_type) == 0)
-                        {
-                            foundType = true;
-                            break;
+        // Validar subject.entities[].type
+        if (!foundType) {
+            JsonObjectConst subject = sub["subject"].as<JsonObjectConst>();
+            if (!subject.isNull()) {
+                JsonArrayConst entities = subject["entities"].as<JsonArrayConst>();
+                if (!entities.isNull()) {
+                    for (JsonVariantConst ev : entities) {
+                        JsonObjectConst ent = ev.as<JsonObjectConst>();
+                        if (!ent.isNull() && ent["type"].is<const char*>()) {
+                            const char* type = ent["type"].as<const char*>();
+                            if (type && strcmp(type, wanted_type) == 0) {
+                                foundType = true;
+                                break;
+                            }
                         }
                     }
                 }
             }
         }
 
-        if (foundDescription && foundType)
-            return true;
+        if (foundDescription && foundType) return true;
     }
 
     return false;
