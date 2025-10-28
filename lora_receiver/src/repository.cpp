@@ -26,6 +26,7 @@ DynamicJsonDocument Get_subscriptions() {
 
     http.setReuse(true);
     http.begin(url);
+    http.setTimeout(60000);
     http.addHeader("Content-Type", "application/json");
 
     const int httpCode = http.GET();
@@ -74,6 +75,7 @@ bool Post_subscription(const char *description, const char *type, const char *no
 
     http.setReuse(true);
     http.begin(url);
+    http.setTimeout(60000);
     http.addHeader("Content-Type", "application/json");
 
     // Construir payload JSON
@@ -161,8 +163,6 @@ bool Patch_entity_attrs(const char *entityId, const DynamicJsonDocument &bodyDoc
     String url = String(URL_SERVER) + "/entities/" + String(entityId) + "/attrs";
     Serial.println("\n[HTTP] [Patch_entity_attrs] begin... " + url);
 
-    http.setReuse(true);
-    http.setTimeout(10000);
     http.begin(url);
     http.addHeader("Content-Type", "application/json");
 
@@ -175,6 +175,9 @@ bool Patch_entity_attrs(const char *entityId, const DynamicJsonDocument &bodyDoc
     // Enviar PATCH. Algunos cores soportan http.PATCH(body) directamente;
     // usamos sendRequest para mayor compatibilidad.
     int httpCode = http.sendRequest("PATCH", (uint8_t *)body.c_str(), body.length());
+
+    delay(2000);
+    http.end();
 
     // Error de conexión / red
     if (httpCode <= 0)
@@ -189,12 +192,10 @@ bool Patch_entity_attrs(const char *entityId, const DynamicJsonDocument &bodyDoc
     if (httpCode == HTTP_CODE_NO_CONTENT || httpCode == HTTP_CODE_OK || httpCode == HTTP_CODE_CREATED)
     {
         Serial.printf("[HTTP] [Patch_entity_attrs] Success, code: %d\n", httpCode);
+        /*
         String response = http.getString();
-        if (response.length())
-        {
-            Serial.println("[HTTP] [Patch_entity_attrs] Response:");
-            Serial.println(response);
-        }
+        Serial.println(response);
+        */
         http.end();
         return true;
     }
@@ -222,6 +223,7 @@ bool Post_new_entity(const DynamicJsonDocument &bodyDoc)
 
     http.setReuse(true);
     http.begin(url);
+    http.setTimeout(60000);
     http.addHeader("Content-Type", "application/json");
 
     String body;

@@ -125,28 +125,16 @@ void loop()
       int written = snprintf(packetBuf, sizeof(packetBuf),
         "{"
           "\"latitude\":{"
-            "\"value\":%.6f,\"type\":\"Float\",\"metadata\":{"
-              "\"unitCode\":{\"value\":\"DD\",\"type\":\"Text\"},"
-              "\"unit\":{\"value\":\"decimal_degrees\",\"type\":\"Text\"}"
-            "}"  // metadata
+            "\"value\":%.6f,\"type\":\"Float\""
           "},"
           "\"longitude\":{"
-            "\"value\":%.6f,\"type\":\"Float\",\"metadata\":{"
-              "\"unitCode\":{\"value\":\"DD\",\"type\":\"Text\"},"
-              "\"unit\":{\"value\":\"decimal_degrees\",\"type\":\"Text\"}"
-            "}"  // metadata
+            "\"value\":%.6f,\"type\":\"Float\""
           "},"
           "\"temperature\":{"
-            "\"value\":%.2f,\"type\":\"Float\",\"metadata\":{"
-              "\"unitCode\":{\"value\":\"CEL\",\"type\":\"Text\"},"
-              "\"unit\":{\"value\":\"degrees_celsius\",\"type\":\"Text\"}"
-            "}"  // metadata
+            "\"value\":%.2f,\"type\":\"Float\""
           "},"
           "\"humidity\":{"
-            "\"value\":%.2f,\"type\":\"Float\",\"metadata\":{"
-              "\"unitCode\":{\"value\":\"P1\",\"type\":\"Text\"},"
-              "\"unit\":{\"value\":\"percent_of_relative_humidity\",\"type\":\"Text\"}"
-            "}"  // metadata
+            "\"value\":%.2f,\"type\":\"Float\""
           "}"
         "}",
         lat, lng, temp, hum);
@@ -163,9 +151,9 @@ void loop()
         LoRa.beginPacket();
         LoRa.print(packetBuf);
         LoRa.endPacket();
+        Serial.printf("Enviado por LoRa: #%d\n", counter);
       }
-
-      Serial.printf("Enviado por LoRa: #%d\n", counter);
+      
       counter++;
     }
     else

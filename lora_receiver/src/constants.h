@@ -12,7 +12,7 @@
 // Receiver metadata
 #define MODEL "ttgo-t-beam"
 #define PROJECT "iot-2025-02"
-#define ID "sensor1"
+#define ID "sensor12342"
 #define TYPE "receiver"
 
 
@@ -29,11 +29,11 @@
 #define LORA_CS 18
 
 // Configuracion del WIFI
-#define SSID "UPBWiFi"
-#define PASSWORD ""
+#define SSID "joham"
+#define PASSWORD "joham1015"
 
 // Server variables
-#define URL_SERVER "http://localhost:1026/v2"
+#define URL_SERVER "http://34.235.124.18:1026/v2"
 #define URL_SERVER_NOTIFICATION_SUBS "http://quantumleap:8668/v2/notify"
 
 // LED interno del TTGO T-Beam
