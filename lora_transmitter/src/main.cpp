@@ -20,7 +20,7 @@
 
 // ----- CONFIGURACIÓN GPS -----
 TinyGPSPlus gps;
-HardwareSerial gpsSerial(1);  // UART1 para el GPS
+HardwareSerial gpsSerial(1); // UART1 para el GPS
 #define GPS_RX_PIN 34
 #define GPS_TX_PIN 12
 #define GPS_BAUD 9600
@@ -34,13 +34,14 @@ unsigned long lastSend = 0;
 int counter = 0;
 
 // -------------------------------------------------------------------
-void setup() {
+void setup()
+{
   Serial.begin(115200);
   delay(1000);
   Serial.println("Iniciando TTGO T-Beam LoRa + GPS + HDC1080");
 
   // --- Enciende GPS (AXP2101 puede apagarlo por defecto) ---
-  pinMode(14, OUTPUT);       // algunas T-Beam V1.2 usan GPIO14 para power GPS
+  pinMode(14, OUTPUT); // algunas T-Beam V1.2 usan GPIO14 para power GPS
   digitalWrite(14, HIGH);
   delay(500);
 
@@ -71,9 +72,11 @@ void setup() {
 #endif
 
   LoRa.setPins(RADIO_CS_PIN, RADIO_RST_PIN, RADIO_DIO0_PIN);
-  if (!LoRa.begin(CONFIG_RADIO_FREQ * 1000000)) {
+  if (!LoRa.begin(CONFIG_RADIO_FREQ * 1000000))
+  {
     Serial.println("Error al iniciar LoRa!");
-    while (1);
+    while (1)
+      ;
   }
   LoRa.setTxPower(CONFIG_RADIO_OUTPUT_POWER);
   LoRa.setSignalBandwidth(CONFIG_RADIO_BW * 1000);
@@ -85,12 +88,15 @@ void setup() {
 }
 
 // -------------------------------------------------------------------
-bool leerGPS(float &lat, float &lng) {
-  while (gpsSerial.available() > 0) {
+bool leerGPS(float &lat, float &lng)
+{
+  while (gpsSerial.available() > 0)
+  {
     gps.encode(gpsSerial.read());
   }
 
-  if (gps.location.isUpdated() && gps.location.isValid()) {
+  if (gps.location.isUpdated() && gps.location.isValid())
+  {
     lat = gps.location.lat();
     lng = gps.location.lng();
     return true;
@@ -99,25 +105,71 @@ bool leerGPS(float &lat, float &lng) {
 }
 
 // -------------------------------------------------------------------
-void loop() {
+void loop()
+{
   float lat = 0, lng = 0;
   double temp = hdc1080.readTemperature();
   double hum = hdc1080.readHumidity();
 
-  if (millis() - lastSend > 3000) { // cada 1 segundo
+  if (millis() - lastSend > 3000)
+  { // cada 1 segundo
     lastSend = millis();
 
-    if (leerGPS(lat, lng)) {
+    if (leerGPS(lat, lng))
+    {
       Serial.printf("GPS: %.6f, %.6f | Temp: %.2f °C | Hum: %.2f %%\n", lat, lng, temp, hum);
 
-      // Enviar por LoRa
-      LoRa.beginPacket();
-      LoRa.printf("GPS:%.6f,%.6f;T:%.2f;H:%.2f;#%d", lat, lng, temp, hum, counter, ID);
-      LoRa.endPacket();
+      // Construir JSON manualmente (sin librerías) con metadatos según el formato solicitado
+      // Aumentamos el buffer para tener margen suficiente
+      char packetBuf[512]; // ajustar si necesita más campos
+      int written = snprintf(packetBuf, sizeof(packetBuf),
+        "{"
+          "\"latitude\":{"
+            "\"value\":%.6f,\"type\":\"Float\",\"metadata\":{"
+              "\"unitCode\":{\"value\":\"DD\",\"type\":\"Text\"},"
+              "\"unit\":{\"value\":\"decimal_degrees\",\"type\":\"Text\"}"
+            "}"  // metadata
+          "},"
+          "\"longitude\":{"
+            "\"value\":%.6f,\"type\":\"Float\",\"metadata\":{"
+              "\"unitCode\":{\"value\":\"DD\",\"type\":\"Text\"},"
+              "\"unit\":{\"value\":\"decimal_degrees\",\"type\":\"Text\"}"
+            "}"  // metadata
+          "},"
+          "\"temperature\":{"
+            "\"value\":%.2f,\"type\":\"Float\",\"metadata\":{"
+              "\"unitCode\":{\"value\":\"CEL\",\"type\":\"Text\"},"
+              "\"unit\":{\"value\":\"degrees_celsius\",\"type\":\"Text\"}"
+            "}"  // metadata
+          "},"
+          "\"humidity\":{"
+            "\"value\":%.2f,\"type\":\"Float\",\"metadata\":{"
+              "\"unitCode\":{\"value\":\"P1\",\"type\":\"Text\"},"
+              "\"unit\":{\"value\":\"percent_of_relative_humidity\",\"type\":\"Text\"}"
+            "}"  // metadata
+          "}"
+        "}",
+        lat, lng, temp, hum);
+
+      // Verificar overflow
+      if (written < 0 || written >= (int)sizeof(packetBuf))
+      {
+        // manejar error (por ejemplo truncar o no enviar)
+        Serial.println("Packet JSON too large, not sent");
+      }
+      else
+      {
+        // Enviar por LoRa
+        LoRa.beginPacket();
+        LoRa.print(packetBuf);
+        LoRa.endPacket();
+      }
 
       Serial.printf("Enviado por LoRa: #%d\n", counter);
       counter++;
-    } else {
+    }
+    else
+    {
       Serial.println("Esperando señal GPS...");
     }
   }

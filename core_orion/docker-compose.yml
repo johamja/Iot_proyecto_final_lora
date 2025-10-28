@@ -4,7 +4,6 @@
 # En este ejemplo vamos a usar un sensor que lee la temperatura de una termocupla
 # y la almacena en una base de datos en un servidor FiWARE en la Nube
 # sudo sysctl -w vm.max_map_count=262144
-version: "3.8"
 services:
   # Orion es el motor principal, el agente, el context broker
   orion:

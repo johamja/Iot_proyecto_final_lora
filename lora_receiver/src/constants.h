@@ -4,6 +4,18 @@
 // Comunicacion de la terminal o Begin serial 
 #define SERIAL_BAUDRATE 115200
 
+// Suscrption
+#define SUSCRIPTION_DESCRIPTION "notify_robert_iot_sensors_2025"
+#define SUSCRIPTION_TYPE "temperature_humidity_and_gps_sensor"
+
+
+// Receiver metadata
+#define MODEL "ttgo-t-beam"
+#define PROJECT "iot-2025-02"
+#define ID "sensor1"
+#define TYPE "receiver"
+
+
 // Configuracion lora
 #define RADIO_CS_PIN 18
 #define RADIO_RST_PIN 23
@@ -19,6 +31,10 @@
 // Configuracion del WIFI
 #define SSID "UPBWiFi"
 #define PASSWORD ""
+
+// Server variables
+#define URL_SERVER "http://localhost:1026/v2"
+#define URL_SERVER_NOTIFICATION_SUBS "http://quantumleap:8668/v2/notify"
 
 // LED interno del TTGO T-Beam
 #define LED 13

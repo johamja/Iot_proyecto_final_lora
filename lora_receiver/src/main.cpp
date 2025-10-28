@@ -1,354 +1,11 @@
 #include <Arduino.h>
-<<<<<<< Updated upstream
-#include <WiFi.h>
-#include <HTTPClient.h>
-#include <LoRa.h>
-#include <ArduinoJson.h>
-
-// Constantes para usar WiFi
-const char *ssid = "UPBWiFi";
-const char *password = "";
-const char *orionURL = "http://54.221.81.187:1026/v2/entities"; // Orion Context Broker
-
-// Configuración LoRa para TTGO T-Beam
-#define LORA_SCK 5
-#define LORA_MISO 19
-#define LORA_MOSI 27
-#define LORA_CS 18
-#define LORA_RST 23
-#define LORA_DIO0 26
-#define LED 13
-
-#define CONFIG_RADIO_FREQ 915.0
-
-// Constantes del dispositivo receptor
-const char *receiverId = "lora-receiver-01";
-const char *receiverType = "LoRaReceiver";
-
-HTTPClient http;
-String output;
-int state = 1;
-int entityCounter = 1;
-
-void connectWiFi()
-{
-    Serial.println("Connecting to " + String(ssid));
-    WiFi.begin(ssid, password);
-
-    int attempts = 0;
-    while (WiFi.status() != WL_CONNECTED && attempts < 20)
-    {
-        delay(500);
-        Serial.print(".");
-        attempts++;
-        digitalWrite(LED, !digitalRead(LED));
-    }
-
-    if (WiFi.status() == WL_CONNECTED)
-    {
-        Serial.println("\nWiFi connected");
-        Serial.print("IP address: ");
-        Serial.println(WiFi.localIP());
-        digitalWrite(LED, HIGH);
-    }
-    else
-    {
-        Serial.println("\nError conectando WiFi!");
-        digitalWrite(LED, LOW);
-    }
-}
-
-void setupLoRa()
-{
-    SPI.begin(LORA_SCK, LORA_MISO, LORA_MOSI, LORA_CS);
-    LoRa.setPins(LORA_CS, LORA_RST, LORA_DIO0);
-
-    if (!LoRa.begin(CONFIG_RADIO_FREQ * 1000000))
-    {
-        Serial.println("Error iniciando LoRa!");
-        while (1)
-            ;
-    }
-
-    Serial.println("LoRa iniciado en 915MHz");
-}
-
-/**
- * Extrae valores numéricos del mensaje LoRa
- */
-bool extractGPSData(String message, float &lat, float &lon)
-{
-    // Buscar patrones comunes en mensajes GPS
-    int latIndex = message.indexOf("Lat:");
-    int lonIndex = message.indexOf("Lon:");
-
-    if (latIndex != -1 && lonIndex != -1)
-    {
-        String latStr = message.substring(latIndex + 4, lonIndex);
-        String lonStr = message.substring(lonIndex + 4);
-
-        // Limpiar y convertir
-        latStr.trim();
-        lonStr.trim();
-
-        // Remover comas si existen
-        latStr.replace(",", "");
-        lonStr.replace(",", "");
-
-        lat = latStr.toFloat();
-        lon = lonStr.toFloat();
-
-        return (lat != 0.0 && lon != 0.0);
-    }
-
-    return false;
-}
-
-/**
- * Crea una entidad NGSI-LD para FIWARE Orion
- */
-String createFIWAREEntity(String loraMessage, int rssi, float snr)
-{
-    JsonDocument doc;
-
-    // ID único para la entidad
-    String entityId = "urn:ngsi-ld:Sensor:" + String(receiverId) + "-" + String(entityCounter);
-    entityCounter++;
-
-    doc["id"] = entityId;
-    doc["type"] = "Sensor";
-
-    // Atributo: mensaje recibido
-    JsonObject message = doc["message"].to<JsonObject>();
-    message["type"] = "Property";
-    message["value"] = loraMessage;
-
-    // Atributo: intensidad de señal
-    JsonObject signalStrength = doc["rssi"].to<JsonObject>();
-    signalStrength["type"] = "Property";
-    signalStrength["value"] = rssi;
-    signalStrength["unitCode"] = "dBm";
-
-    // Atributo: relación señal-ruido
-    JsonObject signalNoise = doc["snr"].to<JsonObject>();
-    signalNoise["type"] = "Property";
-    signalNoise["value"] = snr;
-    signalNoise["unitCode"] = "dB";
-
-    // Atributo: timestamp
-    JsonObject timestamp = doc["timestamp"].to<JsonObject>();
-    timestamp["type"] = "Property";
-    timestamp["value"] = millis();
-
-    // Extraer coordenadas GPS si están en el mensaje
-    float lat = 0.0, lon = 0.0;
-    if (extractGPSData(loraMessage, lat, lon))
-    {
-        JsonObject location = doc["location"].to<JsonObject>();
-        location["type"] = "GeoProperty";
-        location["value"]["type"] = "Point";
-        location["value"]["coordinates"][0] = lon;
-        location["value"]["coordinates"][1] = lat;
-    }
-
-    // Atributo: dispositivo receptor
-    JsonObject receiver = doc["receiver"].to<JsonObject>();
-    receiver["type"] = "Property";
-    receiver["value"] = receiverId;
-
-    String jsonString;
-    serializeJson(doc, jsonString);
-    return jsonString;
-}
-
-/**
- * Envía entidad a Orion Context Broker
- */
-bool sendToOrion(String entityJson)
-{
-    // Primero intentamos crear la entidad
-    http.begin(orionURL);
-    http.addHeader("Content-Type", "application/json");
-    http.addHeader("User-Agent", "TTGO-LoRa-FIWARE/1.0");
-
-    Serial.println("Enviando a Orion...");
-    Serial.println(entityJson);
-
-    int httpResponseCode = http.POST(entityJson);
-
-    bool success = false;
-    if (httpResponseCode == 201 || httpResponseCode == 204)
-    {
-        Serial.println("✅ Entidad creada en Orion");
-        success = true;
-    }
-    else if (httpResponseCode == 422)
-    {
-        // La entidad ya existe, intentar actualizar
-        Serial.println("⚠️  Entidad existe, actualizando...");
-
-        // Extraer ID de la entidad para la URL de actualización
-        JsonDocument doc;
-        deserializeJson(doc, entityJson);
-        String entityId = doc["id"].as<String>();
-
-        // CORRECCIÓN: URL de actualización sin "/" duplicado
-        String updateURL = String(orionURL) + "/" + entityId + "/attrs";
-        Serial.print("URL de actualización: ");
-        Serial.println(updateURL);
-
-        http.begin(updateURL);
-        http.addHeader("Content-Type", "application/json");
-
-        httpResponseCode = http.PATCH(entityJson);
-        if (httpResponseCode == 204)
-        {
-            Serial.println("✅ Entidad actualizada en Orion");
-            success = true;
-        }
-        else
-        {
-            Serial.print("❌ Error en actualización: ");
-            Serial.println(httpResponseCode);
-        }
-    }
-    else
-    {
-        Serial.print("❌ Error en Orion: ");
-        Serial.println(httpResponseCode);
-
-        String response = http.getString();
-        if (response.length() > 0)
-        {
-            Serial.print("Respuesta: ");
-            Serial.println(response);
-        }
-    }
-
-    http.end();
-    return success;
-}
-
-/**
- * Configuración inicial
- */
-void setup()
-{
-    Serial.begin(115200);
-    pinMode(LED, OUTPUT);
-
-    // Configurar LoRa
-    setupLoRa();
-
-    // Conectar WiFi
-    connectWiFi();
-
-    Serial.println("Receptor LoRa FIWARE listo - Esperando datos...");
-}
-
-/**
- * Máquina de estados para receptor LoRa + FIWARE
- */
-void loop()
-{
-    Serial.printf("jbaskdbfal");
-    switch (state)
-    {
-    case 1: // RECEIVE - Esperar datos LoRa
-    {
-        int packetSize = LoRa.parsePacket();
-
-        if (packetSize)
-        {
-            // Leer el mensaje
-            String mensaje = "";
-            while (LoRa.available())
-            {
-                mensaje += (char)LoRa.read();
-            }
-
-            int rssi = LoRa.packetRssi();
-            float snr = LoRa.packetSnr();
-
-            Serial.println("=== DATO RECIBIDO ===");
-            Serial.print("Mensaje: ");
-            Serial.println(mensaje);
-            Serial.print("RSSI: ");
-            Serial.print(rssi);
-            Serial.println(" dBm");
-            Serial.print("SNR: ");
-            Serial.print(snr);
-            Serial.println(" dB");
-
-            // Crear entidad FIWARE
-            String entityJson = createFIWAREEntity(mensaje, rssi, snr);
-            output = entityJson;
-            state = 2;
-
-            // LED indicador
-            digitalWrite(LED, LOW);
-            delay(100);
-            digitalWrite(LED, HIGH);
-        } else  {
-            Serial.printf("Sin dato");
-        }
-    }
-    break;
-
-    case 2: // SEND - Enviar a FIWARE Orion
-    {
-        Serial.println("Enviando datos a FIWARE Orion...");
-
-        if (WiFi.status() != WL_CONNECTED)
-        {
-            Serial.println("WiFi desconectado - Reconectando...");
-            connectWiFi();
-            delay(1000);
-        }
-
-        if (WiFi.status() == WL_CONNECTED)
-        {
-            bool success = sendToOrion(output);
-            if (success)
-            {
-                Serial.println("✅ Datos enviados exitosamente a FIWARE");
-            }
-            else
-            {
-                Serial.println("❌ Falló el envío a FIWARE");
-            }
-        }
-        else
-        {
-            Serial.println("No se pudo conectar a WiFi");
-        }
-
-        state = 3;
-    }
-    break;
-
-    case 3: // WAIT - Breve espera
-    {
-        Serial.println("Esperando 2 segundos...");
-        delay(2000);
-        state = 1;
-    }
-    break;
-
-    default:
-        Serial.println("Estado no reconocido - Reiniciando");
-        state = 1;
-        break;
-    }
-
-    delay(50);
-=======
 #include <LoRa.h>
 #include <WiFi.h>
 #include <HTTPClient.h>
 #include <ArduinoJson.h>
 #include "constants.h"
 #include "services.h"
+#include "repository.h"
 
 int state = 1;
 
@@ -360,41 +17,144 @@ void setup()
     Lora_connection();
     WiFi_connection();
 
-    Serial.println("Receptor LoRa FIWARE listo - Esperando datos...");
+    // Check if the subscription is active
+    while (true)
+    {
+        DynamicJsonDocument sucriptions(4096);
+        sucriptions = Get_subscriptions();
+        if (!sucriptions.is<JsonArray>())
+        {
+            if (Has_description_and_type(sucriptions, SUSCRIPTION_DESCRIPTION, SUSCRIPTION_TYPE))
+            {
+                Serial.println("[GOOD] Description and type found");
+                break;
+            }
+            else
+            {
+                Serial.println("[BAD] The condition (description+type) was not met");
+                bool subscription = Post_subscription(SUSCRIPTION_DESCRIPTION, SUSCRIPTION_TYPE, URL_SERVER_NOTIFICATION_SUBS);
+                if (subscription)
+                {
+                    Serial.println("[GOOD] The subscription was created");
+                    break;
+                }
+            }
+        }
+        else
+        {
+            Serial.println("[BAD] Unable to get subscriptions, sleeping for 3 seconds");
+            sleep(3000);
+        }
+    }
+
+    Serial.println("[OK] FIWARE LoRa Receiver Ready - Waiting for data...");
 }
 
 void loop()
 {
+    DynamicJsonDocument orion_data_new(2048);
+
     switch (state)
     {
-        // RECEIVE - Esperar datos LoRa
-    case 1:
+    case 1: // RECEIVE - CHIRP - Esperar datos LoRa del receptor
+    {
         int packetSize = LoRa.parsePacket();
 
         if (packetSize)
         {
-            
+            // Read message
+            String message = "";
+            while (LoRa.available())
+            {
+                message += (char)LoRa.read();
+            }
+
+            int rssi = LoRa.packetRssi();
+            long error_hz = LoRa.packetFrequencyError();
+            float snr = LoRa.packetSnr();
+
+            Serial.println("=== DATO RECIBIDO ===");
+            Serial.printf("Mensaje: %s", message);
+            Serial.printf("RSSI: %s/dBm \t\t Packet Frequency Error: %d/Hz \t\t SNR: %f/dB\n", rssi, error_hz, snr);
+
+            // Create JSON
+            orion_data_new = Create_orion_package(message, rssi, snr, error_hz);
+            state = 2;
         }
         else
         {
+            Serial.println("XXX XXX XXX Data no recivido XXX XXX XXX");
         }
 
         break;
-    case 2:
-        /* code */
-        break;
-    case 3:
-        /* code */
-        break;
-    case 4:
-        /* code */
-        break;
-    case 5:
-        /* code */
-        break;
+    }
 
-    default:
+
+    case 2:
+    {
+
+        Serial.println("[INFO] Sending data to FIWARE Orion...");
+
+        if (WiFi.status() != WL_CONNECTED)
+        {
+            Serial.println("WiFi desconectado - Reconectando...");
+            WiFi_connection();
+            delay(1000);
+        }
+
+        if (WiFi.status() == WL_CONNECTED)
+        {
+            bool success = Patch_entity_attrs(ID, orion_data_new);
+            if (success)
+            {
+                Serial.println("[GOOD] Data successfully sent to FIWARE");
+                state = 3;
+            }
+            else
+            {
+                Serial.println("[BAD] Failed to send to FIWARE");
+                Serial.println("[INFO] Create the entity in Orion");
+
+                // Campos base de la entidad
+                orion_data_new["id"] = ID;     // e.g. "sensor2"
+                orion_data_new["type"] = TYPE; // e.g. "receiver"
+                success = Post_new_entity(orion_data_new);
+
+                if (success)
+                {
+                    Serial.println("[GOOD] Data successfully sent to FIWARE and a new entity was created");
+                    state = 3;
+                }
+                else
+                {
+                    Serial.println("[BAD] Unable to create entity in Orion");
+                    delay(1000);
+                }
+            }
+        }
+        else
+        {
+            Serial.println("[BAD] Could not connect to WiFi");
+        }
+
         break;
     }
->>>>>>> Stashed changes
+
+
+    case 3: // WAIT - Breve espera
+    {
+        Serial.println("[OK] Waiting 2 seconds...");
+        delay(2000);
+        state = 1;
+        break;
+    }
+
+    
+    default:
+    {
+        Serial.println("[BAD] Unrecognized State - Restarting");
+        state = 1;
+        break;
+    }
+    }
 }
